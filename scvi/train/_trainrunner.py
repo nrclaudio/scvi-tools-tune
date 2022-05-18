@@ -98,13 +98,14 @@ class TrainRunner:
         self.training_plan = training_plan
         self.data_splitter = data_splitter
         self.model = model
-        gpus, device = parse_use_gpu_arg(use_gpu)
         accelerator = MPSAccelerator()
         if accelerator.is_available() and use_gpu is not False:
             gpus = None
             device = torch.device("mps")
             trainer_kwargs.update(dict(accelerator=accelerator, devices=1))
             logger.info("Using Apple Silicon accelerator.")
+        else:
+            gpus, device = parse_use_gpu_arg(use_gpu)
         self.gpus = gpus
         self.device = device
         self.trainer = Trainer(max_epochs=max_epochs, gpus=gpus, **trainer_kwargs)
