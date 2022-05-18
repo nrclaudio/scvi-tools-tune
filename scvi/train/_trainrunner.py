@@ -37,11 +37,7 @@ class MPSAccelerator(Accelerator):
 
     @staticmethod
     def is_available() -> bool:
-        try:
-            torch.ones(5, 5, device=torch.device("mps"))
-        except AssertionError:
-            return False
-        return True
+        return torch.backends.mps.is_available()
 
     def get_device_stats(self, device: Union[str, torch.device]) -> Dict[str, Any]:
         # Return optional device statistics for loggers
