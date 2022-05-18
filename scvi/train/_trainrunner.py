@@ -1,10 +1,12 @@
 import logging
 import warnings
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+import torch
+from pytorch_lightning.accelerators import Accelerator
 
 from scvi.dataloaders import DataSplitter, SemiSupervisedDataSplitter
 from scvi.model._utils import parse_use_gpu_arg
@@ -12,6 +14,46 @@ from scvi.model.base import BaseModelClass
 from scvi.train import Trainer
 
 logger = logging.getLogger(__name__)
+
+
+class MPSAccelerator(Accelerator):
+    """Experimental support for MPS, optimized for large-scale machine learning."""
+
+    @staticmethod
+    def parse_devices(devices: Any) -> Any:
+        # Put parsing logic here how devices can be passed into the Trainer
+        # via the `devices` argument
+        return devices
+
+    @staticmethod
+    def get_parallel_devices(devices: Any) -> Any:
+        # Here, convert the device indices to actual device objects
+        return [torch.device("mps")]
+
+    @staticmethod
+    def auto_device_count() -> int:
+        # Return a value for auto-device selection when `Trainer(devices="auto")`
+        return 1
+
+    @staticmethod
+    def is_available() -> bool:
+        try:
+            torch.ones(5, 5, device=torch.device("mps"))
+        except AssertionError:
+            return False
+        return True
+
+    def get_device_stats(self, device: Union[str, torch.device]) -> Dict[str, Any]:
+        # Return optional device statistics for loggers
+        return {}
+
+    @classmethod
+    def register_accelerators(cls, accelerator_registry):
+        accelerator_registry.register(
+            "mps",
+            cls,
+            description="MPS Accelerator - optimized for Apple Silicon.",
+        )
 
 
 class TrainRunner:
@@ -61,6 +103,12 @@ class TrainRunner:
         self.data_splitter = data_splitter
         self.model = model
         gpus, device = parse_use_gpu_arg(use_gpu)
+        accelerator = MPSAccelerator()
+        if accelerator.is_available():
+            gpus = None
+            device = torch.device("mps")
+            trainer_kwargs.update(dict(accelerator=accelerator, devices=1))
+            logger.info("Using Apple Silicon accelerator.")
         self.gpus = gpus
         self.device = device
         self.trainer = Trainer(max_epochs=max_epochs, gpus=gpus, **trainer_kwargs)
