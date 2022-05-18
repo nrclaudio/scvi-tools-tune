@@ -104,7 +104,7 @@ class TrainRunner:
         self.model = model
         gpus, device = parse_use_gpu_arg(use_gpu)
         accelerator = MPSAccelerator()
-        if accelerator.is_available():
+        if accelerator.is_available() and use_gpu is not False:
             gpus = None
             device = torch.device("mps")
             trainer_kwargs.update(dict(accelerator=accelerator, devices=1))
